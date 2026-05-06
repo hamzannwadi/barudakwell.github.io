@@ -105,4 +105,100 @@
         
         // Pemain pertama yang masuk otomatis jadi Host untuk memulai game
         db.ref('tod/players').once('value', snap => {
-            if(Object.keys(snap.val())
+            if(Object.keys(snap.val())[0] === myName) {
+                let startBtn = document.createElement("button");
+                startBtn.innerText = "MULAI GAME (HOST)";
+                startBtn.onclick = (e) => { e.stopPropagation(); startRace(); };
+                document.getElementById('init-area').appendChild(startBtn);
+            }
+        });
+    }
+
+    function startRace() {
+        db.ref('tod/gameStatus').set('waiting');
+        db.ref('tod/currentChallenge').set(null); // Reset tantangan lama
+        let delay = Math.random() * 4000 + 2000; // Antara 2-6 detik
+        setTimeout(() => {
+            db.ref('tod/gameStatus').set('green');
+        }, delay);
+    }
+
+    db.ref('tod/gameStatus').on('value', status => {
+        const val = status.val();
+        if(val === 'green') {
+            isGreen = true;
+            startTime = Date.now();
+            document.getElementById('game-screen').className = "ready";
+            document.getElementById('game-screen').innerHTML = "<h1>KLIK SEKARANG!!!</h1>";
+        } else if (val === 'reset') {
+            location.reload();
+        }
+    });
+
+    function handleTap() {
+        if(hasClicked || myName === "") return;
+        hasClicked = true;
+        let reaction = isGreen ? (Date.now() - startTime) : 9998; // 9998 = Curang/Terlalu cepat
+        db.ref('tod/players/' + myName).update({ time: reaction });
+    }
+
+    // Pantau hasil dari semua pemain
+    db.ref('tod/players').on('value', snap => {
+        const players = snap.val();
+        if(!players) return;
+        
+        const keys = Object.keys(players);
+        const finished = Object.values(players).filter(p => p.time !== 9999);
+
+        if(finished.length === keys.length && keys.length >= 2) {
+            showLeaderboard(players);
+        }
+    });
+
+    function showLeaderboard(players) {
+        const sorted = Object.entries(players).sort((a,b) => a[1].time - b[1].time);
+        const loser = sorted[sorted.length - 1];
+        
+        document.getElementById('result-overlay').style.display = 'flex';
+        let listHtml = sorted.map((p, i) => {
+            let timeTxt = p[1].time === 9998 ? "CURANG!" : p[1].time + "ms";
+            return `<p>${i+1}. ${p[0]}: <b>${timeTxt}</b></p>`;
+        }).join("");
+        
+        document.getElementById('leaderboard').innerHTML = listHtml;
+        document.getElementById('decision-area').style.display = 'block';
+        document.getElementById('loser-msg').innerText = `Si Lemot adalah ${loser[0]}!`;
+
+        // Hanya si pecundang yang melihat tombol pilihan
+        if(myName === loser[0]) {
+            document.getElementById('choice-buttons').style.display = 'block';
+        } else {
+            document.getElementById('choice-buttons').innerHTML = `<p style="color:#f1c40f">Menunggu ${loser[0]} memilih nasib...</p>`;
+        }
+    }
+
+    function choose(type) {
+        const list = type === 'truth' ? dataTruth : dataDare;
+        const challenge = list[Math.floor(Math.random() * list.length)];
+        db.ref('tod/currentChallenge').set({ type: type.toUpperCase(), text: challenge });
+    }
+
+    db.ref('tod/currentChallenge').on('value', snap => {
+        const data = snap.val();
+        if(data) {
+            document.getElementById('decision-area').style.display = 'none';
+            document.getElementById('final-challenge').style.display = 'block';
+            document.getElementById('challenge-type').innerText = "KONSEKUENSI " + data.type;
+            document.getElementById('challenge-text').innerText = data.text;
+        }
+    });
+
+    function resetGame() {
+        // Hanya satu orang yang perlu reset database
+        db.ref('tod').set(null).then(() => {
+            db.ref('tod/gameStatus').set('reset');
+        });
+    }
+</script>
+</body>
+</html>
