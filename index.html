@@ -14,15 +14,15 @@
         .ready { background: var(--green); }
         
         .overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); flex-direction: column; justify-content: center; align-items: center; z-index: 10; }
-        .card { background: #222; padding: 30px; border-radius: 20px; border: 2px solid #444; width: 80%; max-width: 400px; }
+        .card { background: #222; padding: 30px; border-radius: 20px; border: 2px solid #444; width: 85%; max-width: 400px; }
         
         button { padding: 15px 30px; margin: 10px; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; font-size: 1rem; }
         .btn-truth { background: var(--blue); color: white; }
         .btn-dare { background: var(--red); color: white; }
-        .btn-reset { background: #555; color: white; }
+        .btn-reset { background: #555; color: white; margin-top: 20px; }
         
-        input { padding: 12px; border-radius: 8px; border: none; margin-bottom: 10px; width: 200px; }
-        #leaderboard { text-align: left; margin: 20px 0; font-size: 0.9rem; }
+        input { padding: 12px; border-radius: 8px; border: none; margin-bottom: 10px; width: 80%; max-width: 250px; color: #000; }
+        #leaderboard { text-align: left; margin: 20px 0; font-size: 0.9rem; border-top: 1px solid #444; padding-top: 10px; }
     </style>
 </head>
 <body>
@@ -30,8 +30,8 @@
 <div id="game-screen" class="waiting" onclick="handleTap()">
     <div id="init-area">
         <h1>⚡ Reaction Race</h1>
-        <p>Siapa paling lambat, dia kena <b>Truth or Dare</b>!</p>
-        <input type="text" id="p-name" placeholder="Nama Kamu">
+        <p>Siapa paling lambat, kena <b>Truth or Dare</b>!</p>
+        <input type="text" id="p-name" placeholder="Masukkan Nama Kamu">
         <br>
         <button onclick="joinGame(event)" style="background: var(--green);">JOIN GAME</button>
     </div>
@@ -52,20 +52,25 @@
 
         <div id="final-challenge" style="display:none;">
             <h3 id="challenge-type" style="color: var(--blue);"></h3>
-            <p id="challenge-text" style="font-size: 1.2rem; font-style: italic;"></p>
+            <p id="challenge-text" style="font-size: 1.2rem; font-style: italic; color: #f1c40f;"></p>
             <button class="btn-reset" onclick="resetGame()">MAIN LAGI</button>
         </div>
     </div>
 </div>
 
 <script>
-    // --- FIREBASE CONFIG (WAJIB DIISI) ---
+    // --- FIREBASE CONFIG KAMU ---
     const firebaseConfig = {
-        apiKey: "AIza...",
-        databaseURL: "https://your-project.firebaseio.com",
-        projectId: "your-project-id",
-        appId: "..."
+      apiKey: "AIzaSyAT_xnQ9WImOx5IDKGZLws3B3EKW2i2JOg",
+      authDomain: "mygame-f7dc3.firebaseapp.com",
+      databaseURL: "https://mygame-f7dc3-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "mygame-f7dc3",
+      storageBucket: "mygame-f7dc3.firebasestorage.app",
+      messagingSenderId: "623658276101",
+      appId: "1:623658276101:web:584bb73050b10a24c1d36c",
+      measurementId: "G-41N0XYP1PK"
     };
+
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
@@ -77,108 +82,27 @@
     const dataTruth = [
         "Siapa orang yang terakhir kamu kepoin di Instagram?",
         "Apa kebohongan terbesar yang pernah kamu katakan ke orang tua?",
-        "Pernahkah kamu menyukai teman satu tongkrongan ini?",
-        "Apa hal paling memalukan yang pernah terjadi padamu di kampus?"
+        "Pernahkah kamu menyukai teman yang ada di room ini?",
+        "Apa hal paling memalukan yang pernah terjadi padamu di kampus?",
+        "Siapa orang di sini yang menurutmu paling menyebalkan?"
     ];
 
     const dataDare = [
         "Chat mantan bilang 'Ternyata kamu masih yang terbaik'.",
         "Lakukan push-up 10x sambil teriak 'Aku beban kelompok!'",
-        "Tunjukkan galeri foto terakhir tanpa dihapus.",
-        "Telepon teman acak dan nyanyikan lagu 'Balonku' sampai selesai."
+        "Tunjukkan 3 foto terakhir di galerimu ke kamera.",
+        "Telepon teman acak dan nyanyikan lagu 'Balonku' sampai selesai.",
+        "Post story IG foto selfie muka jelek selama 5 menit."
     ];
 
     function joinGame(e) {
         e.stopPropagation();
-        myName = document.getElementById('p-name').value;
-        if(!myName) return alert("Nama jangan kosong!");
-        document.getElementById('init-area').innerHTML = "<h2>Menunggu Host memulai...</h2>";
+        myName = document.getElementById('p-name').value.trim();
+        if(!myName) return alert("Isi nama dulu, bos!");
+        
+        document.getElementById('init-area').innerHTML = "<h2>Menunggu pemain lain...</h2><p>Host akan memulai jika semua sudah siap.</p>";
         db.ref('tod/players/' + myName).set({ time: 9999 });
         
-        // Host (pemain pertama) memicu game
+        // Pemain pertama yang masuk otomatis jadi Host untuk memulai game
         db.ref('tod/players').once('value', snap => {
-            if(Object.keys(snap.val())[0] === myName) {
-                setTimeout(startRace, 3000);
-            }
-        });
-    }
-
-    function startRace() {
-        db.ref('tod/gameStatus').set('waiting');
-        let delay = Math.random() * 3000 + 2000;
-        setTimeout(() => {
-            db.ref('tod/gameStatus').set('green');
-        }, delay);
-    }
-
-    db.ref('tod/gameStatus').on('value', status => {
-        if(status.val() === 'green') {
-            isGreen = true;
-            startTime = Date.now();
-            document.getElementById('game-screen').className = "ready";
-            document.getElementById('game-screen').innerHTML = "<h1>KLIK SEKARANG!!!</h1>";
-        } else if (status.val() === 'reset') {
-            location.reload();
-        }
-    });
-
-    function handleTap() {
-        if(hasClicked || myName === "") return;
-        hasClicked = true;
-        let reaction = isGreen ? (Date.now() - startTime) : 9998;
-        db.ref('tod/players/' + myName).update({ time: reaction });
-        checkResults();
-    }
-
-    function checkResults() {
-        db.ref('tod/players').on('value', snap => {
-            const players = snap.val();
-            const keys = Object.keys(players);
-            const finished = Object.values(players).filter(p => p.time !== 9999);
-
-            if(finished.length === keys.length && keys.length >= 2) {
-                showLeaderboard(players);
-            }
-        });
-    }
-
-    function showLeaderboard(players) {
-        const sorted = Object.entries(players).sort((a,b) => a[1].time - b[1].time);
-        const loser = sorted[sorted.length - 1];
-        
-        document.getElementById('result-overlay').style.display = 'flex';
-        let listHtml = sorted.map((p, i) => `<p>${i+1}. ${p[0]}: ${p[1].time}ms</p>`).join("");
-        document.getElementById('leaderboard').innerHTML = listHtml;
-
-        document.getElementById('decision-area').style.display = 'block';
-        document.getElementById('loser-msg').innerText = `Si Lemot adalah ${loser[0]}! Pilih nasibmu:`;
-
-        // Hanya si pecundang yang bisa klik tombol Truth/Dare
-        if(myName !== loser[0]) {
-            document.getElementById('choice-buttons').innerHTML = `<p>Menunggu ${loser[0]} memilih...</p>`;
-        }
-    }
-
-    function choose(type) {
-        const list = type === 'truth' ? dataTruth : dataDare;
-        const challenge = list[Math.floor(Math.random() * list.length)];
-        db.ref('tod/currentChallenge').set({ type: type.toUpperCase(), text: challenge });
-    }
-
-    db.ref('tod/currentChallenge').on('value', snap => {
-        const data = snap.val();
-        if(data) {
-            document.getElementById('decision-area').style.display = 'none';
-            document.getElementById('final-challenge').style.display = 'block';
-            document.getElementById('challenge-type').innerText = data.type;
-            document.getElementById('challenge-text').innerText = data.text;
-        }
-    });
-
-    function resetGame() {
-        db.ref('tod').set(null);
-        db.ref('tod/gameStatus').set('reset');
-    }
-</script>
-</body>
-</html>
+            if(Object.keys(snap.val())
